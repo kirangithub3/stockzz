@@ -1,0 +1,25 @@
+{% extends "layout.html" %}
+{% block main %}
+<table class="table">
+    <thead>
+      <tr>
+        <th scope="col">stock symbol</th>
+        <th scope="col">number of stocks</th>
+        <th scope="col">timestamp</th>
+        <th scope="col">type_of_transaction</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for history_data in history_data %}
+
+
+      <tr>
+        <td>{{ history_data["stock_symbol"] }}</td>
+        <td>{{ history_data["number_of_stocks"] }}</td>
+        <td>{{ history_data["timestamp"] }}</td>
+        <td>{{history_data["type_of_transaction"]}}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

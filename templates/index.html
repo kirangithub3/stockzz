@@ -1,0 +1,38 @@
+{% extends "layout.html" %}
+{% block main %}
+<table class="table">
+    <thead>
+      <tr>
+        <th scope="col">stock symbol</th>
+        <th scope="col">number of stocks</th>
+        <th scope="col">stock price</th>
+        <th scope="col"></th>
+
+      </tr>
+    </thead>
+    <tbody>
+
+      {% for transaction in transactions %}
+
+
+      <tr>
+        <td>{{ transaction["symbol"] }}</td>
+        <td>{{ transaction["shares"] }}</td>
+        <td>{{ transaction["price"] }}</td>
+        <td></td>
+      </tr>
+
+      {% endfor %}
+    </tbody>
+
+    <tfoot>
+        <tr>
+          <td></td>
+          <td></td>
+          <td>cash left:</td>
+          <td>{{cash}}</td>
+        </tr>
+    </tfoot>
+</table>
+
+{% endblock %}

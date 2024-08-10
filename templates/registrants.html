@@ -1,0 +1,14 @@
+<htmL>
+   <head>
+      registrants
+   </head>
+   <body>
+      <ul>
+         {% for username, password in registrants.items() %}
+          <li> {{ username }} has password {{ password }} </li>
+         {% endfor %}
+      </ul>
+   </body>
+</htmL>
+
+
