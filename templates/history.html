@@ -1,23 +1,32 @@
 {% extends "layout.html" %}
+
+{% block title %}
+    History
+{% endblock %}
+
 {% block main %}
-<table class="table">
+<table class="table table-striped">
     <thead>
       <tr>
-        <th scope="col">stock symbol</th>
-        <th scope="col">number of stocks</th>
-        <th scope="col">timestamp</th>
-        <th scope="col">type_of_transaction</th>
+        <th scope="col" class="text-start">Symbol</th>
+        <th scope="col" class="text-end">Shares</th>
+        <th scope="col" class="text-end">Price</th>
+        <th scope="col" class="text-end">Transacted</th>
       </tr>
     </thead>
     <tbody>
-      {% for history_data in history_data %}
-
-
+      {% for row in history_data %}
       <tr>
-        <td>{{ history_data["stock_symbol"] }}</td>
-        <td>{{ history_data["number_of_stocks"] }}</td>
-        <td>{{ history_data["timestamp"] }}</td>
-        <td>{{history_data["type_of_transaction"]}}</td>
+        <td class="text-start">{{ row["symbol"] }}</td>
+        <td class="text-end">
+          {% if row["shares"] > 0 %}
+            +{{ row["shares"] }}
+          {% else %}
+            {{ row["shares"] }}
+          {% endif %}
+        </td>
+        <td class="text-end">{{ row["price"] | usd }}</td>
+        <td class="text-end">{{ row["date"] }}</td>
       </tr>
       {% endfor %}
     </tbody>

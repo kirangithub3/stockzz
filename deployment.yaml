@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cs50-finance-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cs50-finance
+  template:
+    metadata:
+      labels:
+        app: cs50-finance
+    spec:
+      containers:
+        - name: cs50-finance
+          image: kirankkp/cs50-finance:latest
+          ports:
+            - containerPort: 5000

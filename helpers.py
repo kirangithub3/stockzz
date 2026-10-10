@@ -2,7 +2,7 @@ import csv
 import datetime
 import pytz
 import requests
-import urllib
+import urllib.parse
 import uuid
 
 from flask import redirect, render_template, request, session
@@ -51,37 +51,33 @@ def login_required(f):
 
 
 def lookup(symbol):
-    """Look up quote for symbol."""
-
-    # Prepare API request
-    symbol = symbol.upper()
-    end = datetime.datetime.now(pytz.timezone("US/Eastern"))
-    start = end - datetime.timedelta(days=7)
-
-    # Yahoo Finance API
-    url = (
-        f"https://query1.finance.yahoo.com/v7/finance/download/{urllib.parse.quote_plus(symbol)}"
-        f"?period1={int(start.timestamp())}"
-        f"&period2={int(end.timestamp())}"
-        f"&interval=1d&events=history&includeAdjustedClose=true"
-    )
-
-    # Query API
-    try:
-        response = requests.get(
-            url,
-            cookies={"session": str(uuid.uuid4())},
-            headers={"Accept": "*/*", "User-Agent": request.headers.get("User-Agent")},
-        )
-        response.raise_for_status()
-
-        # CSV header: Date,Open,High,Low,Close,Adj Close,Volume
-        quotes = list(csv.DictReader(response.content.decode("utf-8").splitlines()))
-        price = round(float(quotes[-1]["Adj Close"]), 2)
-        return {"price": price, "symbol": symbol}
-    except (KeyError, IndexError, requests.RequestException, ValueError):
+    """Look up quote for symbol using Yahoo Finance v8 chart API."""
+    if not symbol:
         return None
 
+    symbol = symbol.upper().strip()
+
+    try:
+        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        }
+
+        response = requests.get(url, headers=headers, timeout=5)
+        response.raise_for_status()
+
+        data = response.json()
+        result = data["chart"]["result"][0]
+        price = result["meta"]["regularMarketPrice"]
+
+        return {
+            "name": symbol,
+            "price": round(float(price), 2),
+            "symbol": symbol
+        }
+    except Exception as e:
+        print(f"DEBUG: lookup exception -> {e}")
+        return None
 
 def usd(value):
     """Format value as USD."""

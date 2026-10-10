@@ -20,9 +20,9 @@ app.config["SESSION_PERMANENT"] = False
 app.config["SESSION_TYPE"] = "filesystem"
 Session(app)
 
-# Configure CS50 Library to use SQLite database
-db = SQL("sqlite:///finance.db")
 
+# Configure CS50 Library to use SQLite database on the persistent volume
+db = SQL("sqlite:///finance.db")
 
 @app.after_request
 def after_request(response):
@@ -47,31 +47,47 @@ def index():
 @app.route("/buy", methods=["GET", "POST"])
 @login_required
 def buy():
-    if request.method =="GET":
+    if request.method == "GET":
         return render_template("buy.html")
     else:
-        stock_symbol =request.form.get("stock_symbol")
-        number_of_stocks= request.form.get("number_of_stocks")
+        # Check for matching form input names (symbol & shares vs stock_symbol & number_of_stocks)
+        symbol = request.form.get("symbol") or request.form.get("stock_symbol")
+        shares = request.form.get("shares") or request.form.get("number_of_stocks")
 
-        stock = lookup(stock_symbol.upper())
-        if stock == None:
-            return apology("Not a valid stock symbol")
-        if int(number_of_stocks) < 0:
-            return apology("Shares cannot be negative")
-        transaction_value = int(number_of_stocks) *stock["price"]
-        cash =db.execute("SELECT cash FROM users WHERE id =?",session["user_id"])
-        user_cash = cash[0]["cash"]
+        if not symbol:
+            return apology("Must provide a stock symbol", 400)
+
+        stock = lookup(symbol.strip().upper())
+        if stock is None:
+            return apology("Not a valid stock symbol", 400)
+
+        # Validate shares integer input
+        try:
+            shares = int(shares)
+            if shares <= 0:
+                return apology("Shares must be a positive integer", 400)
+        except (ValueError, TypeError):
+            return apology("Shares must be a positive integer", 400)
+
+        transaction_value = shares * stock["price"]
+        cash_db = db.execute("SELECT cash FROM users WHERE id = ?", session["user_id"])
+        user_cash = cash_db[0]["cash"]
+
         if user_cash < transaction_value:
-            return apology("Not enough money")
-        db.execute("UPDATE users SET cash = cash - ? WHERE id = ?",transaction_value,session["user_id"])
+            return apology("Not enough money", 400)
+
+        # Update cash
+        db.execute("UPDATE users SET cash = cash - ? WHERE id = ?", transaction_value, session["user_id"])
+        
+        # Log transaction
         time = datetime.datetime.now()
+        db.execute(
+            "INSERT INTO transactions (user_id, symbol, shares, price, date) VALUES (?, ?, ?, ?, ?)",
+            session["user_id"], stock["symbol"], shares, stock["price"], time
+        )
 
-        db.execute("INSERT INTO transactions(user_id,symbol,shares,price,date) VALUES(?,?,?,?,?)",session["user_id"],stock["symbol"],number_of_stocks,stock["price"],time)
-        flash("bought!")
-
-
+        flash("Bought!")
         return redirect("/")
-
 
 
 
@@ -80,7 +96,15 @@ def buy():
 @login_required
 def history():
     """Show history of transactions"""
-    return apology("TODO")
+    user_id = session["user_id"]
+    
+    # Query your transactions table using your actual columns (symbol, shares, price, date)
+    history_data = db.execute(
+        "SELECT symbol, shares, price, date FROM transactions WHERE user_id = ? ORDER BY date DESC",
+        user_id
+    )
+
+    return render_template("history.html", history_data=history_data)
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -137,14 +161,20 @@ def quote():
         return render_template("stockquote.html")
     else:
         stockquote = request.form.get("stockquote")
+        print("DEBUG: Received form input ->", repr(stockquote))
+
         if not stockquote:
-            return apology("Must provide a stock symbol")
+            print("DEBUG: Triggered empty stockquote apology")
+            return apology("Must provide a stock symbol", 400)
 
-        stock_data = lookup(stockquote.upper())
-        if stock_data == None:
-            return apology("Not a valid stock symbol")
+        stock_data = lookup(stockquote.strip().upper())
+        print("DEBUG: lookup() result ->", stock_data)
 
-        return render_template("stock_data.html",stock_data=stock_data)
+        if stock_data is None:
+            print("DEBUG: Triggered lookup returned None apology")
+            return apology("Not a valid stock symbol", 400)
+
+        return render_template("stock_data.html", stock_data=stock_data)
 
 
 
@@ -187,40 +217,57 @@ def register():
 @app.route("/sell", methods=["GET", "POST"])
 @login_required
 def sell():
-    if request.method =="GET":
-        user_id = session["user_id"]
-        symbols_user= db.execute("SELECT symbol FROM transactions WHERE user_id = :id GROUP BY symbol HAVING SUM(shares) > 0",id =user_id )
-        return render_template("sell.html",symbols = [row["symbol"] for row in symbols_user])
+    user_id = session["user_id"]
+
+    if request.method == "GET":
+        symbols_user = db.execute(
+            "SELECT symbol FROM transactions WHERE user_id = ? GROUP BY symbol HAVING SUM(shares) > 0", 
+            user_id
+        )
+        return render_template("sell.html", symbols=[row["symbol"] for row in symbols_user])
 
     else:
-        stock_symbol =request.form.get("symbol")
-        number_of_stocks= request.form.get("number_of_stocks")
-        user_id = session["user_id"]
+        symbol = request.form.get("symbol") or request.form.get("stock_symbol")
+        shares = request.form.get("shares") or request.form.get("number_of_stocks")
 
-        stock = lookup(stock_symbol.upper())
-        if stock == None:
-            return apology("Not a valid stock symbol")
-        if int(number_of_stocks) < 0:
-            return apology("Shares cannot be negative")
-        transaction_value = int(number_of_stocks) *stock["price"]
-        cash =db.execute("SELECT cash FROM users WHERE id =?",session["user_id"])
-        user_cash = cash[0]["cash"]
+        if not symbol:
+            return apology("Must select a stock symbol", 400)
 
-        user_shares = db.execute("SELECT shares FROM transactions WHERE user_id =? AND symbol =? GROUP BY symbol",user_id,stock_symbol)
-        user_shares_real = user_shares[0]["shares"]
-        if int(number_of_stocks) > user_shares_real:
-            return apology("You donot have enough shares")
+        stock = lookup(symbol.strip().upper())
+        if stock is None:
+            return apology("Not a valid stock symbol", 400)
 
-        db.execute("UPDATE users SET cash = cash + ? WHERE id = ?",transaction_value,session["user_id"])
+        try:
+            shares = int(shares)
+            if shares <= 0:
+                return apology("Shares must be a positive integer", 400)
+        except (ValueError, TypeError):
+            return apology("Shares must be a positive integer", 400)
+
+        # Check user current share total
+        user_shares_db = db.execute(
+            "SELECT SUM(shares) AS total_shares FROM transactions WHERE user_id = ? AND symbol = ?",
+            user_id, stock["symbol"]
+        )
+        user_shares_real = user_shares_db[0]["total_shares"] or 0
+
+        if shares > user_shares_real:
+            return apology("You do not have enough shares", 400)
+
+        transaction_value = shares * stock["price"]
+
+        # Update cash
+        db.execute("UPDATE users SET cash = cash + ? WHERE id = ?", transaction_value, user_id)
+
+        # Log negative share transaction for sale
         time = datetime.datetime.now()
-        transactions_db = db.execute("SELECT shares FROM TRANSACTIONS WHERE user_id =? AND symbol =",user_id,stock_symbol)
-        new_shares = transactions_db[0]["shares"] -int(number_of_stocks)
-        db.execute("UPDATE transactions SET shares =  ? WHERE id = ? AND symbol = ?",new_shares,user_id,stock_symbol)
-        flash("Sold")
+        db.execute(
+            "INSERT INTO transactions (user_id, symbol, shares, price, date) VALUES (?, ?, ?, ?, ?)",
+            user_id, stock["symbol"], -shares, stock["price"], time
+        )
 
-
+        flash("Sold!")
         return redirect("/")
-
 
 if __name__ == '__main__':
     app.debug = True
