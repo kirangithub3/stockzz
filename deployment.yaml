@@ -17,3 +17,10 @@ spec:
           image: kirankkp/cs50-finance:latest
           ports:
             - containerPort: 5000
+          volumeMounts:
+            - mountPath: /app/data
+              name: sqlite-storage
+      volumes:
+        - name: sqlite-storage
+          persistentVolumeClaim:
+            claimName: sqlite-pvc

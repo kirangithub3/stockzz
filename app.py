@@ -1,6 +1,8 @@
 import os
 import datetime
 import sqlalchemy
+import shutil
+
 
 from cs50 import SQL
 from flask import Flask, flash, redirect, render_template, request, session
@@ -8,6 +10,20 @@ from flask_session import Session
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from helpers import apology, login_required, lookup, usd
+
+
+# 1. Define paths
+PERSISTENT_DIR = "/app/data"
+PERSISTENT_DB = os.path.join(PERSISTENT_DIR, "finance.db")
+SEED_DB = "finance.db"  # The database bundled in your Docker image root
+
+# 2. Ensure the persistent data directory exists on the PVC
+os.makedirs(PERSISTENT_DIR, exist_ok=True)
+
+# 3. Seed logic: If the persistent DB doesn't exist yet, copy the bundled seed DB over
+if not os.path.exists(PERSISTENT_DB) and os.path.exists(SEED_DB):
+    shutil.copy(SEED_DB, PERSISTENT_DB)
+    print("Successfully seeded persistent database from image!")
 
 # Configure application
 app = Flask(__name__)
@@ -22,7 +38,7 @@ Session(app)
 
 
 # Configure CS50 Library to use SQLite database on the persistent volume
-db = SQL("sqlite:///finance.db")
+db = SQL(f"sqlite:///{PERSISTENT_DB}")
 
 @app.after_request
 def after_request(response):
