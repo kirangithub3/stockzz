@@ -14,6 +14,16 @@ from helpers import apology, login_required, lookup, usd
 
 # 1. Define paths
 PERSISTENT_DIR = "/app/data"
+
+
+
+try:
+    os.makedirs(PERSISTENT_DIR, exist_ok=True)
+except PermissionError:
+    PERSISTENT_DIR = "./data"
+    os.makedirs(PERSISTENT_DIR, exist_ok=True)
+    
+    
 PERSISTENT_DB = os.path.join(PERSISTENT_DIR, "finance.db")
 SEED_DB = "finance.db"  # The database bundled in your Docker image root
 
